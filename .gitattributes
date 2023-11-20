@@ -1,0 +1,8 @@
+#   all text files unix line endings
+* text=auto
+
+*.py    text eol=lf
+*.sh    text eol=lf
+*.lua   text eol=lf
+*.txt   text eol=lf
+
