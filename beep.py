@@ -38,7 +38,7 @@ class Beeper(object):
             'h': 988
         }
     def play(self, mel:str, ms=200):
-        return
+        # return
         for c in mel:
             fr = self.freq.get(c)
             if fr:
@@ -205,35 +205,34 @@ class Beep(object):
         beeped = False
         dt = step.sec
         self.stepOut(step, dt)
-        self.beeper.play('hh')
+        self.beeper.play('h', 400)
         while dt > 0:
             if (dt <= 16 and not beeped):
                 if step.next > step.val:
-                    self.beeper.play('ceg')
+                    self.beeper.play('eg')
                 elif step.next < step.val:
                     self.beeper.play('ge')
                 beeped = True
-            self.sleep(0.25)
-            dt = self.next - self.now()
             self.stepOut(step, dt, beeped)
+            self.sleep(0.2)
+            dt = self.next - self.now()
         self.stats[step.val] += step.sec
-        print()
+        # print()
 
     def stepOut(self, step:Step, sec:int, nx:bool=False):
         if sec < 0: return
         min = int(sec / 60)
         sec = sec % 60
-        print("%2d %2d:%02d" % (step.val, min, sec), end = '')
-        if nx:
-            print(" ->%3d" % step.next, end = '')
-        print(end = '\r')
+        nstr = ''
+        if nx: nstr = '-> %d' % step.next
+        print("%4d %2d:%02d %-20s" % (step.val, min, sec, nstr), end = '\r')
 
     def seqOut(self, seq:list):
         ma  = max([s.val for s in seq])
         sec = sum([s.sec for s in seq])
         min = int(sec / 60)
         sec = sec % 60
-        print('%2d:%02d max: %d' % (min, sec, ma))
+        print('%2d:%02d max: %d               ' % (min, sec, ma))
 
     def allOut(self, show=True):
         ma = 0
