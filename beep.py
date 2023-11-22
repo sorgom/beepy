@@ -38,6 +38,7 @@ class Beeper(object):
             'h': 988
         }
     def play(self, mel:str, ms=200):
+        return
         for c in mel:
             fr = self.freq.get(c)
             if fr:
@@ -46,10 +47,10 @@ class Beeper(object):
 class Step(object):
     def __init__(self, val:int, min:float):
         self.val = val
-        self.sec = int(min * 60 + 0.5)
+        self.sec = int(min * 60)
         self.next = -1
     def __str__(self):
-        return "%d %d:%02d %d" % (self.val, int(self.sec / 60), self.sec % 60, self.next)
+        return "%d %d:%02d" % (self.val, int(self.sec / 60), self.sec % 60)
 
 class Beep(object):
     def __init__(self):
@@ -75,17 +76,10 @@ class Beep(object):
     def quit(self, signo, *args):
         print('interrupt:', signo)
         self.exit.set()
+        exit()
     
     def now(self):
         return datetime.timestamp(datetime.now())
-
-    def addX(self, args):
-        seq = list()
-        for c in args:
-            mo = self.rxX.match(c)
-            if mo:
-                seq.append(Step(int(mo.group(1)), float(mo.group(2))))
-        if seq: self.inp.append(seq)
 
     def addS(self, args):
         up = list()
@@ -155,15 +149,21 @@ class Beep(object):
                 self.add(line.split())
         # self.rxCom = re.compile(r'^#.*\s*', re.M)
 
-    def addT(self, args):
+    def addX(self, args):
         seq = list()
         for c in args:
-            if self.rxI.match(c):
+            s = None
+            mo = self.rxX.match(c)
+            if mo:
+                s = Step(int(mo.group(1)), float(mo.group(2)))
+            elif self.rxI.match(c):
                 s = Step(int(c), self.dur)
+            if s:
                 if len(seq) > 0 and s.val == seq[-1].val:
-                    seq[-1].sec += s.sec
+                        seq[-1].sec += s.sec
                 else:
                     seq.append(s)
+
         if seq: self.inp.append(seq)
 
     def add(self, args):
@@ -174,7 +174,7 @@ class Beep(object):
             elif (o == '-r'):
                 self.inp = self.loop
             elif (o == '-t'):
-                self.mode = 't'
+                self.mode = 'x'
                 self.dur = float(v)
             else:
                 self.mode = o[1]
@@ -187,8 +187,6 @@ class Beep(object):
             self.addS(args)
         elif self.mode == 'x':
             self.addX(args)
-        elif self.mode == 't':
-            self.addT(args)
 
     def connect(self, seqs:list):
         lseqs = len(seqs)
@@ -204,7 +202,6 @@ class Beep(object):
     def runStep(self, step:Step):
         self.next += step.sec
         beeped = False
-        print()
         dt = step.sec
         self.stepOut(step, dt)
         self.beeper.play('hh')
@@ -218,6 +215,8 @@ class Beep(object):
             self.sleep(0.25)
             dt = self.next - self.now()
             self.stepOut(step, dt, beeped)
+        self.stats[step.val] += step.sec
+        print()
 
     def stepOut(self, step:Step, sec:int, nx:bool=False):
         min = int(sec / 60)
@@ -227,13 +226,41 @@ class Beep(object):
             print(" ->%3d" % step.next, end = '')
         print(end = '\r')
 
+    def seqOut(self, seq:list):
+        ma  = max([s.val for s in seq])
+        sec = sum([s.sec for s in seq])
+        min = int(sec / 60)
+        sec = sec % 60
+        print('%2d:%02d max: %d' % (min, sec, ma))
+
+    def allOut(self):
+        ma = 0
+        sec = 0
+        for seq in [*self.once, *self.loop]:
+            ma = max([ma, *[s.val for s in seq]])
+            sec += sum([s.sec for s in seq])
+        mis = int(sec / 60)
+        hrs = int(mis / 60)
+        mis = mis % 60
+        sec = sec % 60
+        if hrs > 0:
+            print('%d:%02d:%02d max: %d' % (hrs, mis, sec, ma))
+        else:
+            print('%2d:%02d max: %d' % (mis, sec, ma))
+        return ma
 
     def run(self, args):
         self.add(args)
+        if self.once and not self.loop:
+            self.loop.append(self.once.pop())
+
         self.connect(self.once)
         self.connect(self.loop)
         if self.once and self.loop:
             self.once[-1][-1].next = self.loop[0][0].val
+
+        ma = self.allOut()
+        self.stats = [0 for n in range(ma + 1)]
 
         print('once')
         for l in self.once: print(*[str(s) for s in l])
@@ -250,7 +277,7 @@ class Beep(object):
 if __name__ == '__main__':
     bp = Beep()
     print(bp.next)
-
+    bp.run(argv[1:])
     # def testS(data:str):
     #     print('testS:', data)
     #     bp.addS(data.split())    
@@ -277,11 +304,11 @@ if __name__ == '__main__':
     # print()
     # bp.sleep(10.5)
 
-    s = Step(2, 0.4)
-    s.next = 8
-    bp.runStep(s)
-    s.next = 1
-    bp.runStep(s)
+    # s = Step(2, 0.4)
+    # s.next = 8
+    # bp.runStep(s)
+    # s.next = 1
+    # bp.runStep(s)
 
     # bpr = Beeper()
     # bpr.play('ceg')
@@ -289,3 +316,4 @@ if __name__ == '__main__':
     # bpr.play('gec')
     # bp.sleep(1)
     # bpr.play('hh')
+
