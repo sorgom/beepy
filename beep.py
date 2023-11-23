@@ -1,11 +1,10 @@
-from threading import Event
-import signal
-import re
+from datetime import datetime
+from getopt import getopt
+from modBeeper import Beeper
 from os.path import isfile
 from sys import argv
-from getopt import getopt
-from datetime import datetime
-from modBeeper import Beeper
+from threading import Event
+import random, re, signal
 
 #   up / down mode standard -s 
 #   minutes up, same down + pause
@@ -17,7 +16,8 @@ from modBeeper import Beeper
 #
 #   -t x fix time mode, values are levels
 #   -x explicit mode level:minutes
-#   -r loop from here
+#   -l loop from here
+#   -r random object maxv, dur, num
 
 
 class Step(object):
@@ -25,6 +25,61 @@ class Step(object):
         self.val = val
         self.sec = int(min * 60)
         self.next = -1
+
+class RandSeq(object):
+    def __init__(self, maxv, dur, num):
+        random.seed()
+        self.num = int(num)
+        self.dur = float(dur)
+        self.sec = int(self.dur * 60)
+        self.maxv = int(maxv)
+        self.next = 0
+        self.val = min(3, self.maxv)
+        self.vals = list()
+        for n in range(self.maxv + 1):
+            for t in range(n + 1):
+                self.vals.append(n)
+
+    def rlist(self):
+        v = self.val
+        l = [v]
+        while len(l) < self.num:
+            nx = random.choice(self.vals)
+            if nx != v and abs(nx - v) < 4:
+                v = nx
+                l.append(v)
+        return l
+
+    def gen(self):
+        res = []
+        while not res:
+            ok = False
+            l1 = self.rlist()
+            l2 = self.rlist()
+            l2.reverse()
+            src = l1
+            for p in range(self.num):
+                if l2[p] == l1[p]:
+                    src = l2
+                    ok = True
+                res.append(src[p])
+
+            ok = ok and self.maxv in res
+            if not ok: res.clear()
+        
+        ts = [random.uniform(1, 2) for n in range(self.num)]
+        fk = self.dur / sum(ts)
+        ts = [t * fk for t in ts]
+        seq = [ Step(*v) for v in zip(res, ts)]
+        df = self.sec - sum([s.sec for s in seq])
+        s = seq[-1]
+        s.sec += df
+        s.next = self.next
+        s.val = max(1, self.val - 1)
+        for p in range(self.num - 1):
+            seq[p].next = seq[p + 1].val
+        return seq
+
 
 class Beep(object):
     def __init__(self):
@@ -44,6 +99,7 @@ class Beep(object):
         self.dur  = 1.0
         self.stats = list()
         self.info = False
+        self.preview = False
 
     def sleep(self, sec:float=1):
         for n in range(int(sec * 100)):
@@ -142,20 +198,25 @@ class Beep(object):
         if seq: self.inp.append(seq)
 
     def add(self, args):
-        opts, args = getopt(args, 'ip:rst:xS')
+        opts, args = getopt(args, 'ilp:rst:xSP')
         for o, v in opts:
             if (o == '-p'):
                 self.pause = v
-            elif (o == '-r'):
+            elif (o == '-l'):
                 self.inp = self.loop
             elif (o == '-t'):
                 self.mode = 'x'
                 self.dur = float(v)
             elif (o == '-i'):
                 self.info = True
+            elif (o == '-r'):
+                self.inp.append([RandSeq(*args)])
+                return
             elif (o == '-S'):
                 self.dumpStats()
                 exit()
+            elif (o == '-P'):
+                self.preview = True
             else:
                 self.mode = o[1]
 
@@ -181,9 +242,17 @@ class Beep(object):
                 
     def runSeq(self, seq, out=False):
         if out: self.seqOut(seq)
-        for step in seq: self.runStep(step)
+        s0 = seq[0]
+        if type(s0) == RandSeq:
+            self.runSeq(s0.gen(), False)
+        else:
+            for step in seq: self.runStep(step)
 
     def runStep(self, step:Step):
+        if self.preview:
+            self.stepOut(step, step.sec, True)
+            print()
+            return
         self.next += step.sec
         beeped = False
         dt = step.sec
@@ -210,8 +279,16 @@ class Beep(object):
         print("%4d %s %-20s" % (step.val, self.tStr(sec), nstr), end = '\r')
 
     def seqOut(self, seq:list, pref='>'):
-        sec = sum([s.sec for s in seq])
-        print('%s %8s' % (pref, self.tStr(sec)), *[s.val for s in seq], '   ')
+        sec = 0
+        vals = []
+        s0 = seq[0]
+        if type(s0) == RandSeq:
+            vals = ['rnd', s0.maxv]
+            sec = s0.sec
+        else:
+            sec = sum([s.sec for s in seq])
+            vals = [s.val for s in seq]
+        print('%s %8s' % (pref, self.tStr(sec)), *vals, '     ')
         return sec
 
     def tStr(self, sec):
@@ -223,11 +300,18 @@ class Beep(object):
             return '%d:%02d:%02d' % (hrs, min, sec)
         return '%2d:%02d' % (min, sec)
 
+    def maxVal(self, seq):
+        s0 = seq[0]
+        if type(s0) == RandSeq:
+            return s0.maxv
+        else:
+            return max([s.val for s in seq])
+
     def allOut(self, show=True):
         ma = 0
         sec = 0
         for seq in [*self.once, *self.loop]:
-            ma = max([ma, *[s.val for s in seq]])
+            ma = max(ma, self.maxVal(seq))
             sec += sum([s.sec for s in seq])
         if show:
             print('< %8s mx %d >' % (self.tStr(sec), ma))
@@ -300,6 +384,7 @@ class Beep(object):
             self.seqOut(self.loop[0])
         while l2 > 0:
             for seq in self.loop: self.runSeq(seq, l2 > 1)
+            if self.preview: break
 
 if __name__ == '__main__':
     Beep().run(argv[1:])
