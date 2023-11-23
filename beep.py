@@ -40,7 +40,7 @@ class RandSeq(object):
             for t in range(n + 1):
                 self.vals.append(n)
 
-    def rlist(self):
+    def rndList(self):
         v = self.val
         l = [v]
         while len(l) < self.num:
@@ -54,8 +54,8 @@ class RandSeq(object):
         res = []
         while not res:
             ok = False
-            l1 = self.rlist()
-            l2 = self.rlist()
+            l1 = self.rndList()
+            l2 = self.rndList()
             l2.reverse()
             src = l1
             for p in range(self.num):
@@ -79,7 +79,6 @@ class RandSeq(object):
         for p in range(self.num - 1):
             seq[p].next = seq[p + 1].val
         return seq
-
 
 class Beep(object):
     def __init__(self):
