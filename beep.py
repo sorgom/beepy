@@ -254,7 +254,7 @@ class Beep(object):
 
     def runStep(self, step:Step):
         if self.preview:
-            self.stepOut(step, step.sec, True)
+            self.stepOut(step, step.sec, False)
             print()
             return
         self.next += step.sec
