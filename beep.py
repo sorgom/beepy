@@ -1,3 +1,6 @@
+#   ============================================================
+#   beeping training enhancer
+#   ============================================================
 from datetime import datetime
 from getopt import getopt
 from modBeeper import Beeper
@@ -29,12 +32,12 @@ class Step(object):
 class RandSeq(object):
     def __init__(self, maxv, dur, num):
         random.seed()
-        self.num = int(num)
+        self.num = max(5, int(num))
         self.dur = float(dur)
         self.sec = int(self.dur * 60)
         self.maxv = int(maxv)
         self.next = 0
-        self.val = min(3, self.maxv)
+        self.val = min(2, self.maxv)
         self.vals = list()
         for n in range(self.maxv + 1):
             for t in range(n + 1):
@@ -75,7 +78,9 @@ class RandSeq(object):
         s = seq[-1]
         s.sec += df
         s.next = self.next
-        s.val = max(1, self.val - 1)
+        s.val = min(3, self.maxv)
+        if s.val == seq[-2].val and s.val < self.maxv:
+            s.val += 1
         for p in range(self.num - 1):
             seq[p].next = seq[p + 1].val
         return seq
