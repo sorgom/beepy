@@ -39,10 +39,7 @@ class RandSeq(object):
         self.avcnt = max(1, int(self.num / (self.maxv + 1 - self.minv)))
         self.next = 0
         self.val = 1
-        self.vals = list()
-        for n in range(self.minv, self.maxv + 1):
-            for t in range(n + 1):
-                self.vals.append(n)
+        self.vals = list(range(self.minv, self.maxv + 1))
 
     def rndList(self, val):
         v = val
