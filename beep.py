@@ -30,35 +30,41 @@ class Step(object):
         self.next = -1
 
 class RandSeq(object):
-    def __init__(self, maxv, dur, num):
-        random.seed()
+    def __init__(self, maxv, dur, num, minv=0):
         self.num = max(5, int(num))
         self.dur = float(dur)
         self.sec = int(self.dur * 60)
         self.maxv = int(maxv)
+        self.minv = int(minv)
+        self.avcnt = max(1, int(self.num / (self.maxv + 1 - self.minv)))
         self.next = 0
-        self.val = min(2, self.maxv)
+        self.val = 1
         self.vals = list()
-        for n in range(self.maxv + 1):
+        for n in range(self.minv, self.maxv + 1):
             for t in range(n + 1):
                 self.vals.append(n)
 
-    def rndList(self):
-        v = self.val
+    def rndList(self, val):
+        v = val
         l = [v]
         while len(l) < self.num:
-            nx = random.choice(self.vals)
-            if nx != v and abs(nx - v) < 4:
-                v = nx
+            if v < self.minv:
+                v += random.choice([1, 2])
                 l.append(v)
+            else:
+                nx = random.choice(self.vals)
+                if nx != v and abs(nx - v) < 3:
+                    v = nx
+                    l.append(v)
         return l
 
     def gen(self):
+        random.seed()
         res = []
         while not res:
             ok = False
-            l1 = self.rndList()
-            l2 = self.rndList()
+            l1 = self.rndList(1)
+            l2 = self.rndList(0)
             l2.reverse()
             src = l1
             for p in range(self.num):
@@ -67,26 +73,25 @@ class RandSeq(object):
                     ok = True
                 res.append(src[p])
 
-            ok = ok and self.maxv in res
+            ok = ok and res.count(self.maxv) >= self.avcnt
             if not ok: res.clear()
         
         ts = [random.uniform(1, 2) for n in range(self.num)]
+        ts[0] = 1.0
+        ts[-1] = 1.0
         fk = self.dur / sum(ts)
         ts = [t * fk for t in ts]
         seq = [ Step(*v) for v in zip(res, ts)]
         df = self.sec - sum([s.sec for s in seq])
-        s = seq[-1]
-        s.sec += df
-        s.next = self.next
-        s.val = min(3, self.maxv)
-        if s.val == seq[-2].val and s.val < self.maxv:
-            s.val += 1
+        seq[int(self.num / 2)].sec += df
+        seq[-1].next = self.next
         for p in range(self.num - 1):
             seq[p].next = seq[p + 1].val
         return seq
 
 class Beep(object):
     def __init__(self):
+        self.next = self.now()
         self.exit = Event()
         self.beeper = Beeper()
         for sig in ('TERM', 'INT'):
@@ -98,12 +103,12 @@ class Beep(object):
         self.loop = list()
         self.inp  = self.once
         self.pause = 1.0
-        self.next = self.now()
         self.mode = 's'
         self.dur  = 1.0
         self.stats = list()
         self.info = False
         self.preview = False
+        self.lo = False
 
     def sleep(self, sec:float=1):
         for n in range(int(sec * 100)):
@@ -202,7 +207,7 @@ class Beep(object):
         if seq: self.inp.append(seq)
 
     def add(self, args):
-        opts, args = getopt(args, 'ilp:rst:xSP')
+        opts, args = getopt(args, 'ilp:rst:xSPL')
         for o, v in opts:
             if (o == '-p'):
                 self.pause = v
@@ -219,6 +224,8 @@ class Beep(object):
             elif (o == '-S'):
                 self.dumpStats()
                 exit()
+            elif (o == '-L'):
+                self.lo = True
             elif (o == '-P'):
                 self.preview = True
             else:
@@ -381,9 +388,10 @@ class Beep(object):
             self.outInfo()
 
         self.stats = [0 for n in range(ma + 1)]
-        if l1 == 1:
-            self.seqOut(self.once[0])
-        for seq in self.once: self.runSeq(seq, l1 > 1)
+        if not self.lo:
+            if l1 == 1:
+                self.seqOut(self.once[0])
+            for seq in self.once: self.runSeq(seq, l1 > 1)
         if l2 == 1:
             self.seqOut(self.loop[0])
         while l2 > 0:
