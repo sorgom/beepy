@@ -41,6 +41,9 @@ class RandSeq(object):
         self.val = 1
         self.vals = list(range(self.minv, self.maxv + 1))
 
+    def follows(self, v1, v2):
+        return v1 != v2 and abs(v1 - v2) < 3
+
     def rndList(self, val):
         v = val
         l = [v]
@@ -50,7 +53,7 @@ class RandSeq(object):
                 l.append(v)
             else:
                 nx = random.choice(self.vals)
-                if nx != v and abs(nx - v) < 3:
+                if self.follows(nx, v):
                     v = nx
                     l.append(v)
         return l
@@ -64,10 +67,14 @@ class RandSeq(object):
             l2 = self.rndList(0)
             l2.reverse()
             src = l1
+            last = None
             for p in range(self.num):
-                if l2[p] == l1[p]:
-                    src = l2
-                    ok = True
+                if not ok:
+                    if (last is not None) and self.follows(last, l2[p]):
+                        src = l2
+                        ok = True
+                    else:
+                        last = l1[p]
                 res.append(src[p])
 
             ok = ok and res.count(self.maxv) >= self.avcnt
