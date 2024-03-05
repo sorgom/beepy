@@ -30,13 +30,14 @@ class Step(object):
         self.next = -1
 
 class RandSeq(object):
-    def __init__(self, maxv, dur, num, minv=0):
+    def __init__(self, maxv, dur, num, minv=1):
         self.num = max(5, int(num))
         self.dur = float(dur)
         self.sec = int(self.dur * 60)
         self.maxv = int(maxv)
         self.minv = int(minv)
-        self.avcnt = max(1, int(self.num / (self.maxv + 1 - self.minv)))
+        self.xav = max(1, self.num / (self.maxv + 1 - self.minv))
+        self.iav = int(self.xav)
         self.next = 0
         self.val = 1
         self.vals = list(range(self.minv, self.maxv + 1))
@@ -61,13 +62,15 @@ class RandSeq(object):
     def gen(self):
         random.seed()
         res = []
-        while not res:
+        nfd = 0
+        while True:
             ok = False
             l1 = self.rndList(1)
             l2 = self.rndList(0)
             l2.reverse()
             src = l1
             last = None
+            tmp = []
             for p in range(self.num):
                 if not ok:
                     if (last is not None) and self.follows(last, l2[p]):
@@ -75,16 +78,30 @@ class RandSeq(object):
                         ok = True
                     else:
                         last = l1[p]
-                res.append(src[p])
+                tmp.append(src[p])
 
-            ok = ok and res.count(self.maxv) >= self.avcnt
-            if not ok: res.clear()
+            if ok and self.maxv in tmp:
+                nfd += 1
+                if tmp.count(self.maxv) > res.count(self.maxv):
+                    res = tmp.copy()
+            if res.count(self.maxv) >= self.iav or nfd == 5:
+                break
         
         ts = [random.uniform(1, 2) for n in range(self.num)]
+        fk =  self.xav / res.count(self.maxv)
+        if fk > 1:
+            for n, v in enumerate(res):
+                if v == self.maxv:
+                    ts[n] *= fk
+
         ts[0] = 1.0
         ts[-1] = 1.0
         fk = self.dur / sum(ts)
         ts = [t * fk for t in ts]
+        tx = min(ts[0], 1.0)
+        ts[0] = tx
+        ts[-1] = tx
+
         seq = [ Step(*v) for v in zip(res, ts)]
         df = self.sec - sum([s.sec for s in seq])
         seq[int(self.num / 2)].sec += df
@@ -379,7 +396,10 @@ class Beep(object):
         if self.once and not self.loop:
             self.loop.append(self.once.pop())
 
-        self.connect(self.once)
+        if self.lo:
+            self.once.clear()
+        else:
+            self.connect(self.once)
         self.connect(self.loop)
         if self.once and self.loop:
             self.once[-1][-1].next = self.loop[0][0].val
