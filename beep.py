@@ -30,12 +30,15 @@ class Step(object):
         self.next = -1
 
 class RandSeq(object):
-    def __init__(self, maxv, dur, num, minv=1):
+    def __init__(self, maxv, dur, num, minv=1, ffak=1, fav=-1):
         self.num = max(5, int(num))
         self.dur = float(dur)
         self.sec = int(self.dur * 60)
         self.maxv = int(maxv)
         self.minv = int(minv)
+        fav = int(fav)
+        self.fav = self.maxv if fav < self.minv or fav > self.maxv else fav
+        self.ffak = float(ffak)
         self.xav = max(1, self.num / (self.maxv + 1 - self.minv))
         self.iav = int(self.xav)
         self.next = 0
@@ -80,19 +83,23 @@ class RandSeq(object):
                         last = l1[p]
                 tmp.append(src[p])
 
-            if ok and self.maxv in tmp:
+            if ok and self.fav in tmp and self.maxv in tmp:
                 nfd += 1
-                if tmp.count(self.maxv) > res.count(self.maxv):
+                if tmp.count(self.fav) > res.count(self.fav):
                     res = tmp.copy()
-            if res.count(self.maxv) >= self.iav or nfd == 5:
+            if nfd == 5:
                 break
         
         ts = [random.uniform(1, 2) for n in range(self.num)]
-        fk =  self.xav / res.count(self.maxv)
+        fk =  self.xav / res.count(self.fav)
         if fk > 1:
             for n, v in enumerate(res):
-                if v == self.maxv:
+                if v == self.fav:
                     ts[n] *= fk
+        if self.ffak > 1:
+            for n, v in enumerate(res):
+                if v == self.fav:
+                    ts[n] *= self.ffak
 
         ts[0] = 1.0
         ts[-1] = 1.0
@@ -315,7 +322,7 @@ class Beep(object):
         vals = []
         s0 = seq[0]
         if type(s0) == RandSeq:
-            vals = ['rnd', s0.maxv]
+            vals = ['rnd', s0.minv, '..', s0.maxv]
             sec = s0.sec
         else:
             sec = sum([s.sec for s in seq])
