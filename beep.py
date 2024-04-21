@@ -31,22 +31,33 @@ class Step(object):
 
 class RandSeq(object):
     def __init__(self, maxv, dur, num, minv=1, ffak=1, fav=-1):
-        self.num = max(5, int(num))
-        self.dur = float(dur)
-        self.sec = int(self.dur * 60)
-        self.maxv = int(maxv)
-        self.minv = int(minv)
+        dur = float(dur)
         fav = int(fav)
-        self.fav = self.maxv if fav < self.minv or fav > self.maxv else fav
+        maxv = int(maxv)
+        minv = int(minv)
+        num = max(5, int(num))
+        vals = list(range(minv, maxv + 1))
+
+        self.num = num
+        self.dur = dur
+        self.sec = int(dur * 60)
+        self.maxv = maxv
+        self.minv = minv
+        self.vals = vals
+        self.fav = fav if fav in vals else maxv
         self.ffak = float(ffak)
-        self.xav = max(1, self.num / (self.maxv + 1 - self.minv))
+        self.xav = max(1, num / (maxv + 1 - minv))
         self.iav = int(self.xav)
         self.next = 0
         self.val = 1
-        self.vals = list(range(self.minv, self.maxv + 1))
 
     def follows(self, v1, v2):
         return v1 != v2 and abs(v1 - v2) < 3
+
+    def vol(self, a:list) -> int:
+        s = set(a)
+        mc = min(a.count(x) for x in s)
+        return len(s) * mc
 
     def rndList(self, val):
         v = val
@@ -85,7 +96,11 @@ class RandSeq(object):
 
             if ok and self.fav in tmp and self.maxv in tmp:
                 nfd += 1
-                if tmp.count(self.fav) > res.count(self.fav):
+                ctf = tmp.count(self.fav)
+                ctm = tmp.count(self.maxv)
+                crf = res.count(self.fav)
+                crm = res.count(self.maxv)
+                if (ctf > crf) or (ctf == crf and ctm > crm) or (ctf == crf and ctm == crm and self.vol(tmp) > self.vol(res)):
                     res = tmp.copy()
             if nfd == 5:
                 break
