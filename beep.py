@@ -36,20 +36,25 @@ class RandSeq(object):
         maxv = int(maxv)
         minv = int(minv)
         num = max(5, int(num))
-        vals = list(range(minv, maxv + 1))
+        vals = list(range(maxv + 1))
+        self.vals = vals[minv:]
+        fav = fav if fav in self.vals else maxv
+        ffak = max(0.2, float(ffak))
+        ratio = (1 / ffak) ** (1 / max(fav, maxv - fav))
+        self.tfaks = [ ratio ** abs(fav - v) for v in vals]
 
         self.num = num
         self.dur = dur
         self.sec = int(dur * 60)
         self.maxv = maxv
         self.minv = minv
-        self.vals = vals
-        self.fav = fav if fav in vals else maxv
-        self.ffak = max(0.2, float(ffak))
+        self.fav = fav
         self.xav = max(1, num / (maxv + 1 - minv))
         self.iav = int(self.xav)
         self.next = 0
         self.val = 1
+        self.lowest = 1 / 3
+
 
     def follows(self, v1, v2):
         return v1 != v2 and abs(v1 - v2) < 3
@@ -108,10 +113,10 @@ class RandSeq(object):
         fk =  max(1.0, self.xav / res.count(self.fav))
         for n, v in enumerate(res):
             if v == self.fav:
-                ts[n] *= (fk * self.ffak)
+                ts[n] *= fk
+            else:
+                ts[n] = max(self.lowest, ts[n] * self.tfaks[v])
 
-        ts[0] = 1.0
-        ts[-1] = 1.0
         fk = self.dur / sum(ts)
         ts = [t * fk for t in ts]
         tx = min(ts[0], 1.0)
