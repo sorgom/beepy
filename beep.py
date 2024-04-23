@@ -45,7 +45,7 @@ class RandSeq(object):
         self.minv = minv
         self.vals = vals
         self.fav = fav if fav in vals else maxv
-        self.ffak = float(ffak)
+        self.ffak = max(0.2, float(ffak))
         self.xav = max(1, num / (maxv + 1 - minv))
         self.iav = int(self.xav)
         self.next = 0
@@ -54,10 +54,12 @@ class RandSeq(object):
     def follows(self, v1, v2):
         return v1 != v2 and abs(v1 - v2) < 3
 
-    def vol(self, a:list) -> int:
-        s = set(a)
-        mc = min(a.count(x) for x in s)
-        return len(s) * mc
+    def vol(self, a:list) -> float:
+        if len(a) < 3: return 0.0
+        b = a[1:-2]
+        s = set(b)
+        c = [b.count(x) for x in self.vals]
+        return b.count(self.fav) * len(s) * min(c) / max(c)
 
     def rndList(self, val):
         v = val
@@ -96,25 +98,17 @@ class RandSeq(object):
 
             if ok and self.fav in tmp and self.maxv in tmp:
                 nfd += 1
-                ctf = tmp.count(self.fav)
-                ctm = tmp.count(self.maxv)
-                crf = res.count(self.fav)
-                crm = res.count(self.maxv)
-                if (ctf > crf) or (ctf == crf and ctm > crm) or (ctf == crf and ctm == crm and self.vol(tmp) > self.vol(res)):
+                if self.vol(tmp) > self.vol(res):
                     res = tmp.copy()
             if nfd == 5:
+                # print('vol:', self.vol(res))
                 break
         
         ts = [random.uniform(1, 2) for n in range(self.num)]
-        fk =  self.xav / res.count(self.fav)
-        if fk > 1:
-            for n, v in enumerate(res):
-                if v == self.fav:
-                    ts[n] *= fk
-        if self.ffak > 1:
-            for n, v in enumerate(res):
-                if v == self.fav:
-                    ts[n] *= self.ffak
+        fk =  max(1.0, self.xav / res.count(self.fav))
+        for n, v in enumerate(res):
+            if v == self.fav:
+                ts[n] *= (fk * self.ffak)
 
         ts[0] = 1.0
         ts[-1] = 1.0
