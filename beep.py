@@ -59,6 +59,12 @@ class RandSeq(object):
     def follows(self, v1, v2):
         return v1 != v2 and abs(v1 - v2) < 3
 
+    def nval(self, val, minv):
+        tmin = max(minv, val - 2)
+        tmax = min(self.maxv, val + 2) + 1
+        sel = [v for v in range(tmin, tmax) if v != val]
+        return random.choice(sel)
+
     def vol(self, a:list) -> float:
         if len(a) < 3: return 0.0
         b = a[1:-2]
@@ -70,14 +76,13 @@ class RandSeq(object):
         v = val
         l = [v]
         while len(l) < self.num:
-            if v < self.minv:
+            if v == self.minv - 1:
                 v += random.choice([1, 2])
-                l.append(v)
+            elif v < self.minv:
+                v += 2
             else:
-                nx = random.choice(self.vals)
-                if self.follows(nx, v):
-                    v = nx
-                    l.append(v)
+                v = self.nval(v, self.minv)
+            l.append(v)
         return l
 
     def gen(self):
@@ -87,7 +92,7 @@ class RandSeq(object):
         while True:
             ok = False
             l1 = self.rndList(1)
-            l2 = self.rndList(0)
+            l2 = self.rndList(self.nval(self.next, 0))
             l2.reverse()
             src = l1
             last = None
@@ -105,7 +110,7 @@ class RandSeq(object):
                 nfd += 1
                 if self.vol(tmp) > self.vol(res):
                     res = tmp.copy()
-            if nfd == 5:
+            if res and nfd > 4:
                 # print('vol:', self.vol(res))
                 break
         
