@@ -66,32 +66,32 @@ class RandSeq(object):
         return random.choice(sel)
 
     def vol(self, a:list) -> float:
-        if len(a) < 3: return 0.0
-        b = a[1:-2]
-        s = set(b)
-        c = [b.count(x) for x in self.vals]
-        return b.count(self.fav) * len(s) * min(c) / max(c)
+        if not a: return 0
+        c = list()
+        for v in self.vals:
+            if v != self.fav and v in a:
+                c.append(a.count(v))
+        if not c: return 0    
+        return a.count(self.fav) * len(c) * min(c) / max(c)
 
     def rndList(self, val):
         v = val
         l = [v]
         while len(l) < self.num:
-            if v == self.minv - 1:
+            if v < self.minv:
                 v += random.choice([1, 2])
-            elif v < self.minv:
-                v += 2
             else:
                 v = self.nval(v, self.minv)
             l.append(v)
         return l
 
-    def gen(self):
+    def gen(self, lastval:int=0):
         random.seed()
         res = []
         nfd = 0
         while True:
             ok = False
-            l1 = self.rndList(1)
+            l1 = self.rndList(self.nval(lastval, 0))
             l2 = self.rndList(self.nval(self.next, 0))
             l2.reverse()
             src = l1
@@ -111,7 +111,7 @@ class RandSeq(object):
                 if self.vol(tmp) > self.vol(res):
                     res = tmp.copy()
             if res and nfd > 4:
-                # print('vol:', self.vol(res))
+                print('vol: %0.1f' % self.vol(res))
                 break
         
         ts = [random.uniform(1, 2) for n in range(self.num)]
@@ -156,6 +156,7 @@ class Beep(object):
         self.info = False
         self.preview = False
         self.lo = False
+        self.lastval = 0
 
     def sleep(self, sec:float=1):
         for n in range(int(sec * 100)):
@@ -302,7 +303,7 @@ class Beep(object):
         if out: self.seqOut(seq)
         s0 = seq[0]
         if type(s0) == RandSeq:
-            self.runSeq(s0.gen(), False)
+            self.runSeq(s0.gen(self.lastval), False)
         else:
             for step in seq: self.runStep(step)
 
@@ -312,6 +313,7 @@ class Beep(object):
             print()
             return
         self.next += step.sec
+        self.lastval = step.val
         beeped = False
         dt = step.sec
         self.stepOut(step, dt)
