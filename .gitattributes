@@ -1,8 +1,5 @@
 #   all text files unix line endings
-* text=auto
+* text=auto eol=lf
 
-*.py    text eol=lf
-*.sh    text eol=lf
-*.lua   text eol=lf
-*.txt   text eol=lf
-
+*.cmd eol=crlf
+*.bat eol=crlf
