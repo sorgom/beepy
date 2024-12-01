@@ -24,7 +24,6 @@ class Base(object):
         self.next = self.now()
         self.exit = Event()
         self.stats = Counter()
-        self.counted = False
         for sig in ('TERM', 'INT'):
             signal.signal(getattr(signal, 'SIG' + sig), self.quit)
         random.seed()
@@ -47,12 +46,11 @@ class Base(object):
             self.exit.wait(0.01)
     
     def count(self, step:Step):
-        self.counted = True 
         self.stats[step.val] += step.sec
 
     def quit (self, *args):
         self.exit.set()
-        if self.counted:
+        if self.stats:
             self.dumpStats()
         exit()
 
