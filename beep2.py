@@ -27,6 +27,7 @@ class Base(object):
         self.counted = False
         for sig in ('TERM', 'INT'):
             signal.signal(getattr(signal, 'SIG' + sig), self.quit)
+        random.seed()
     
     def now(self):
         return datetime.timestamp(datetime.now())
@@ -157,11 +158,9 @@ class Sequence(object):
     
     def stepOut(self, step:Step, sec:int, nx:bool=False):
         if sec < 0: return
-        nstr = ''
-        if nx: nstr = '-> %d' % step.next
-        print(f'{step.val:4d} {self.base.tStr(sec)} {nstr}{' ':20s}', end = '\r')
-
-
+        nstr = f'-> {step.next:d}' if nx else f'{' ':8s}'
+        print(f'{step.val:4d} {self.base.tStr(sec)} {nstr}', end = '\r')
+        
 class SeqTime(Sequence):
     def __init__(self, base:Base, mins, *args):
         super().__init__(base)
@@ -212,7 +211,7 @@ class SeqRand(Sequence):
         self.fav = fav
         self.xav = max(1, num / (maxv + 1 - minv))
         self.iav = int(self.xav)
-        self.firstVal = self.minv
+        self.firstVal = random.randint(1, 2)
         self.lowest = 1 / 3
 
     def follows(self, v1, v2):
@@ -284,7 +283,6 @@ class SeqRand(Sequence):
                 if self.vol(tmp) > self.vol(res):
                     res = tmp.copy()
             if res and nfd > 4:
-                # print('vol: %0.1f' % self.vol(res))
                 break
         
         ts = [random.uniform(1, 2) for n in range(self.num)]
@@ -296,15 +294,9 @@ class SeqRand(Sequence):
                 ts[n] = max(self.lowest, ts[n] * self.tfaks[v])
 
         fk = self.dur / sum(ts)
-        ts = [t * fk for t in ts]
-        tx = min(ts[0], 1.0)
-        ts[0] = tx
-        ts[-1] = tx
-        ts = [int(t * 60) for t in ts]
-
+        ts = [int(t * 60 * fk) for t in ts]
+        ts[int(self.num / 2)] += self.sec - sum(ts)
         self.steps = [ Step(*v) for v in zip(res, ts)]
-        df = self.sec - sum([s.sec for s in self.steps])
-        self.steps[int(self.num / 2)].sec += df
 
     def announce(self, pref='>'):
         print('%s %8s %s' % (pref, self.base.tStr(self.sec), f'rnd {self.minv} .. {self.maxv}')) 
