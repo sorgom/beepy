@@ -55,7 +55,16 @@ class Base(object):
             self.dumpStats()
         exit()
 
-    def statStr(self, sec:int):
+    @staticmethod
+    def tStr(sec:int)->str:
+        min = int(sec / 60)
+        hrs = int(min / 60)
+        min = min % 60
+        sec = int(sec % 60)
+        return f'{hrs:d}:{min:02d}:{sec:02d}' if hrs > 0 else f'{min:2d}:{sec:02d}'
+
+    @staticmethod
+    def statStr(sec:int):
         min = int(sec / 60)
         hrs = int(min / 60)
         min = min % 60
@@ -93,33 +102,33 @@ class Sequence(object):
     def announce(self, pref='>'):
         sec = sum([s.sec for s in self.steps])
         vals = [s.val for s in self.steps]
-        print('%s %8s' % (pref, self.tStr(sec)), *vals, '     ') 
+        print('%s %8s' % (pref, self.base.tStr(sec)), *vals, '     ') 
         return sec
 
     def gen(self):
         pass
 
-    def run(self):
-        self.gen()
-        self.announce('>')
+    def connect(self):
         last = len(self.steps) - 1
         for n, s in enumerate(self.steps):
             if n < last:
                 s.next = self.steps[n+1].val
             else:
                 s.next = self.next.getFirstVal(s.val) if self.next else 1
+
+    def run(self):
+        self.gen()
+        self.announce('>')
+        self.connect()
+        for s in self.steps:
             self.runStep(s)
 
     def preview(self):
         self.gen()
         sec = self.announce('>')
-        last = len(self.steps) - 1
-        for n, s in enumerate(self.steps):
-            if n < last:
-                s.next = self.steps[n+1].val
-            else:
-                s.next = self.next.getFirstVal(s.val) if self.next else 1
-            self.stepOut(s, s.sec)
+        self.connect()
+        for s in self.steps:
+            self.stepOut(s, s.sec, True)
             print()
         return sec
 
@@ -150,15 +159,7 @@ class Sequence(object):
         if sec < 0: return
         nstr = ''
         if nx: nstr = '-> %d' % step.next
-        print(f'{step.val:4d} {self.tStr(sec)} {nstr}{' ':20s}', end = '\r')
-
-    def tStr(self, sec:int)->str:
-        min = int(sec / 60)
-        hrs = int(min / 60)
-        min = min % 60
-        sec = int(sec % 60)
-        str = f'{min:02d}:{sec:02d}'
-        return f'{hrs:d}:' + str if hrs > 0 else str
+        print(f'{step.val:4d} {self.base.tStr(sec)} {nstr}{' ':20s}', end = '\r')
 
 
 class SeqTime(Sequence):
@@ -236,7 +237,7 @@ class SeqRand(Sequence):
         return (self.minv, self.maxv)
 
     def getFirstVal(self, lastVal:int)-> int:
-        self.firstVal = self.nval(lastVal, min(self.minv, max(0, lastVal - 2)))
+        self.firstVal = self.nval(lastVal, min(self.minv, max(0, lastVal -1)))
         return self.firstVal
 
     def rndList(self, val):
@@ -302,37 +303,39 @@ class SeqRand(Sequence):
         ts = [int(t * 60) for t in ts]
 
         self.steps = [ Step(*v) for v in zip(res, ts)]
-        # print('secs:', self.sec)
         df = self.sec - sum([s.sec for s in self.steps])
-        # print('df:', df)
         self.steps[int(self.num / 2)].sec += df
 
     def announce(self, pref='>'):
-        print('%s %8s %s' % (pref, self.tStr(self.sec), f'rnd {self.minv} .. {self.maxv}')) 
+        print('%s %8s %s' % (pref, self.base.tStr(self.sec), f'rnd {self.minv} .. {self.maxv}')) 
         return self.sec
 
 class Runtime(Base):
     def __init__(self):
         super().__init__()
-        self.pLoop = 0
+        self.pLoop = None
         self.back = None
         self.seqs = list()
         self.preview = False
+        self.info = False
         self.lo = False
         self.fs = 0
+        self.mins = 1.0
+        self.pStart = 0
 
     def addF(self, fp):
-        print('add file:', fp)
         self.fs += 1
         with open(fp, 'r') as fh:
             for line in fh:
                 if not (line.startswith('#') or re.match(r'^\s*$', line)): 
                     self.add(line.split())
+        self.fs -= 1
 
     def add(self, args):
-        opts, args = getopt(args, 'SPB:Llrt')
+        opts, args = getopt(args, 'SPIB:Llrt:')
         if (args and isfile(args[0])):
             self.addF(args[0])
+            args.clear()
 
         if opts:
             for o, v in opts:
@@ -343,30 +346,36 @@ class Runtime(Base):
                 # preview only
                 elif (o == '-P'):
                     self.preview = True
+                # info only
+                elif (o == '-I'):
+                    self.info = True
                 # loop only
                 elif (o == '-L'):
                     self.lo = True
                 # backward loop
                 elif (o == '-B'):
                     self.back = int(v)
-                    self.lo = True
                 # loop announcement
                 elif (o == '-l'):
                     if self.pLoop is None and self.fs < 2:
                         self.pLoop = len(self.seqs)
                 elif (o == '-r'):
                     self.seqs.append(SeqRand(self, *args))
+                    args.clear()
                 elif (o == '-t'):
-                    self.seqs.append(SeqTime(self, *args))
+                    self.mins = float(v)
+
+        if args:
+            self.seqs.append(SeqTime(self, self.mins, *args))
 
     def connect(self) -> bool:
         if not self.seqs:
             return False
-        if self.back:
-            self.pLoop = max(0, len(self.seqs) - self.back)
-        elif not self.pLoop:
-            self.pLoop = len(self.seqs) - 1
         last = len(self.seqs) - 1
+        if self.back:
+            self.pStart = max(0, len(self.seqs) - self.back)
+        elif self.pLoop is None:
+            self.pLoop = last
         for n, seq in enumerate(self.seqs):
             if n < last:
                 seq.setNext(self.seqs[n+1])
@@ -377,19 +386,35 @@ class Runtime(Base):
     def run(self):
         self.add(argv[1:])
         if not self.connect():
-            print('no sequences')
             return
-        ps = self.pLoop if self.lo else 0
+        rangePre = [] if self.lo else list(range(self.pStart,self.pLoop))
+        if self.pStart > self.pLoop:
+            rangePre = list(range(self.pStart, len(self.seqs)))
         if self.preview:
-            for n, seq in enumerate(self.seqs):
-                if n >= ps:
-                    seq.preview()
+            for p in rangePre:
+                self.seqs[p].preview()
+            for seq in self.seqs[self.pLoop:]:
+                seq.preview()
+        elif self.info:
+            secp = 0
+            secl = 0
+            if rangePre:
+                print('pre:')
+                for p in rangePre:
+                    secp += self.seqs[p].announce()
+                print(self.tStr(secp))
+            print('loop:')
+            for seq in self.seqs[self.pLoop:]:
+                secl += seq.announce()
+            print(self.tStr(secl))
+            if rangePre:
+                print('total:')
+                print(self.tStr(secp + secl))
         else:
-            if not self.lo:
-                for seq in self.seqs:   
-                    seq.run()
+            for p in rangePre:
+                self.seqs[p].run()
             while True:
-                for seq in self.seqs[ps:]:
+                for seq in self.seqs[self.pLoop:]:
                     seq.run()
 
 if __name__ == '__main__':
