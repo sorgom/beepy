@@ -167,6 +167,7 @@ class SeqTime(Sequence):
         # $2 min float
         mins = float(mins)
         rx = re.compile(r'^(\d+)(?::(\d*(?:\.\d+)?))?$')
+        lastv = -1
         for n in args:
             m = rx.match(n)
             if m:
@@ -174,7 +175,11 @@ class SeqTime(Sequence):
                 val = int(cval)
                 min = float(cmin) if cmin and cmin != '.' else mins
                 sec = int(min * 60)
-                self.steps.append(Step(val, sec))    
+                if lastv == val:
+                    self.steps[-1].sec += sec
+                else:
+                    self.steps.append(Step(val, sec))    
+                lastv = val
 
     def canStart(self) -> tuple:
         if self.steps:
@@ -410,14 +415,3 @@ class Runtime(Base):
 if __name__ == '__main__':
     rt = Runtime()
     rt.run()
-    # base = Base()
-    # seq1 = SeqRand(base, *'4 20 11 1 2.5'.split())
-    # seq2 = SeqTime(base, *'2.5 3:1.5 4 5'.split())
-    # seq3 = SeqRand(base, *'5 20 11 2 2.5'.split())
-    # seq1.setNext(seq2)
-    # seq2.setNext(seq3)
-    # seq3.setNext(seq1)
-    # seq1.preview()
-    # seq2.preview()
-    # seq3.preview()
-    # seq1.preview()
