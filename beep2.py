@@ -9,6 +9,7 @@ from sys import argv
 from threading import Event
 import random, re, signal
 from collections import Counter
+from json import dump, load
 
 class Step(object):
     def __init__(self, val:int, sec:int):
@@ -61,36 +62,42 @@ class Base(object):
         min = min % 60
         sec = int(sec % 60)
         return f'{hrs:d}:{min:02d}:{sec:02d}' if hrs > 0 else f'{min:2d}:{sec:02d}'
-
+    
     @staticmethod
-    def statStr(sec:int):
-        min = int(sec / 60)
-        hrs = int(min / 60)
-        min = min % 60
-        return f'{hrs:3d}:{min:02d}'
+    def ftStr(sec:int)->str:
+        return f'{Base.tStr(sec):>8}'
 
     def dumpStats(self):
         file = __file__ + '.stats'
+        hist = Counter()
         if isfile(file):
             with open(file, 'r') as fh:
                 a = [int(c) for c in fh.read().split()]
                 for v, s in enumerate(a):
-                    self.stats[v] += s
-        a = [self.stats[v] for v in range(max(self.stats.keys()) + 1)]
-        with open(file, 'w') as fh:
-            fh.write(' '.join([str(s) for s in a]))
-        print('statistics')
-        total = 0
+                    hist[v] += s
+        for v, s in self.stats.items():
+            hist[v] += s
+        if not hist: return
+        a = [hist[v] for v in range(0, max(hist.keys()) + 1)]
+        def statStr(sec:int):
+            min = int(sec / 60)
+            hrs = int(min / 60)
+            min = min % 60
+            return f'{hrs:3d}:{min:02d}'
+        print('statistics:')
         for v, s in enumerate(a):
-            print(f'{v:3d}:', self.statStr(s))
-            total += s
-        print('sum:', self.statStr(total))
-        
+            print(f'{v:3d}:', statStr(s))
+        print('sum:', statStr(sum(a)))
+        if self.stats:
+            with open(file, 'w') as fh:
+                fh.write(' '.join([str(s) for s in a]))
+    
 class Sequence(object):
     def __init__(self, base:Base):   
         self.steps = []
         self.next = None
         self.base = base
+        self.sec = 0
 
     def setNext(self, next:'Sequence'):
         self.next = next
@@ -98,11 +105,9 @@ class Sequence(object):
     def canStart(self) -> tuple:
         return (1, 1)
 
-    def announce(self, pref='>'):
-        sec = sum([s.sec for s in self.steps])
-        vals = [s.val for s in self.steps]
-        print('%s %8s' % (pref, self.base.tStr(sec)), *vals, '     ') 
-        return sec
+    def announce(self):
+        print(f'> {self.base.ftStr(self.sec)}', *[s.val for s in self.steps]) 
+        return self.sec
 
     def gen(self):
         pass
@@ -117,14 +122,14 @@ class Sequence(object):
 
     def run(self):
         self.gen()
-        self.announce('>')
+        self.announce()
         self.connect()
         for s in self.steps:
             self.runStep(s)
 
     def preview(self):
         self.gen()
-        sec = self.announce('>')
+        sec = self.announce()
         self.connect()
         for s in self.steps:
             self.stepOut(s, s.sec, True)
@@ -156,7 +161,7 @@ class Sequence(object):
     
     def stepOut(self, step:Step, sec:int, nx:bool=False):
         if sec < 0: return
-        nstr = f'-> {step.next:d}' if nx else f'{' ':8s}'
+        nstr = f'-> {step.next:d}' if nx else f'{"":8s}'
         print(f'{step.val:4d} {self.base.tStr(sec)} {nstr}', end = '\r')
         
 class SeqTime(Sequence):
@@ -180,6 +185,7 @@ class SeqTime(Sequence):
                 else:
                     self.steps.append(Step(val, sec))    
                 lastv = val
+        self.sec = sum([s.sec for s in self.steps])
 
     def canStart(self) -> tuple:
         if self.steps:
@@ -301,8 +307,8 @@ class SeqRand(Sequence):
         ts[int(self.num / 2)] += self.sec - sum(ts)
         self.steps = [ Step(*v) for v in zip(res, ts)]
 
-    def announce(self, pref='>'):
-        print('%s %8s %s' % (pref, self.base.tStr(self.sec), f'rnd {self.minv} .. {self.maxv}')) 
+    def announce(self):
+        print(f'> {self.base.ftStr(self.sec)} rnd {self.minv} .. {self.maxv}')
         return self.sec
 
 class Runtime(Base):
@@ -388,8 +394,9 @@ class Runtime(Base):
         if self.preview:
             for p in rangePre:
                 self.seqs[p].preview()
-            for seq in self.seqs[self.pLoop:]:
-                seq.preview()
+            for _ in range(2):
+                for seq in self.seqs[self.pLoop:]:
+                    seq.preview()
         elif self.info:
             secp = 0
             secl = 0
@@ -397,14 +404,14 @@ class Runtime(Base):
                 print('pre:')
                 for p in rangePre:
                     secp += self.seqs[p].announce()
-                print(self.tStr(secp))
+                print('=', self.ftStr(secp))
             print('loop:')
             for seq in self.seqs[self.pLoop:]:
                 secl += seq.announce()
-            print(self.tStr(secl))
+            print('=', self.ftStr(secl))
             if rangePre:
                 print('total:')
-                print(self.tStr(secp + secl))
+                print('=', self.ftStr(secp + secl))
         else:
             for p in rangePre:
                 self.seqs[p].run()
