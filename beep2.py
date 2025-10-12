@@ -83,7 +83,7 @@ class Base(object):
             min = int(sec / 60)
             hrs = int(min / 60)
             min = min % 60
-            return f'{hrs:3d}:{min:02d}'
+            return f'{hrs:4d}:{min:02d}'
         print('statistics:')
         for v, s in enumerate(a):
             print(f'{v:3d}:', statStr(s))
@@ -266,7 +266,7 @@ class SeqRand(Sequence):
         if self.next:
             vmin, vmax = self.next.canStart()
             if vmin != vmax:
-                lastv = random.randint(vmin, min(vmax, self.maxv))
+                lastv = random.randint(vmin, min(vmax + 2, self.maxv))
             else:
                 lastv = self.nval(vmin, self.minv)
   
