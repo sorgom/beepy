@@ -234,12 +234,8 @@ class SeqRand(Sequence):
 
     def vol(self, a:list) -> float:
         if not a: return 0
-        c = list()
-        for v in self.vals:
-            if v != self.fav and v in a:
-                c.append(a.count(v))
-        if not c: return 0    
-        return a.count(self.fav) * len(c) * min(c) / max(c)
+        c = [ a.count(v) for v in self.vals if v in a]
+        return len(c) * min(c) / max(c)
 
     def canStart(self) -> tuple:
         return (self.minv, self.maxv)
