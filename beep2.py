@@ -284,11 +284,14 @@ class SeqRand(Sequence):
                 tmp.append(src[p])
 
             if ok and self.fav in tmp and self.maxv in tmp:
-                nfd += 1
-                if self.vol(tmp) > self.vol(res):
-                    res = tmp.copy()
-            if res and nfd > 4:
+            #     nfd += 1
+            #     if self.vol(tmp) > self.vol(res):
+            #         res = tmp.copy()
+            # if res and nfd > 4:
+            #     break
+                res = tmp.copy()
                 break
+        
         
         ts = [random.uniform(1, 2) for n in range(self.num)]
         fk =  max(1.0, self.xav / res.count(self.fav))
