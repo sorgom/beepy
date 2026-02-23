@@ -132,7 +132,7 @@ class Sequence(object):
         sec = self.announce()
         self.connect()
         for s in self.steps:
-            self.stepOut(s, s.sec, True)
+            self.stepOut(s, s.sec)
             print()
         return sec
 
